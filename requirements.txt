@@ -1,6 +1,9 @@
+# Forzamos versiones estables para evitar el error de vegalite
+altair>=5.0.0
+streamlit>=1.31.0
 biosteam
 thermosteam
 pandas
-streamlit
 google-generativeai
 Pillow
+
