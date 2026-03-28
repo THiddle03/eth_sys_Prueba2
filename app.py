@@ -97,34 +97,52 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, pres_mosto, T_flash, P_f
             })
     df_mat = pd.DataFrame(datos_mat)
 
-    # --- Energía (Corrección Específica) ---
+    # ---- PARTE 2: TABLA DE ENERGÍA (Versión BioSTEAM 11.0+) -----
     datos_en = []
     for u in eth_sys.units:
         calor_kw = 0.0
-        tipo = "-"
-        
-        # HXprocess: Recuperación interna
+        tipo_servicio = "-"
+
+    # Caso 1: Recuperación interna (HXprocess)
         if isinstance(u, bst.HXprocess):
+        # Aquí calculamos por diferencia de entalpía porque no hay servicio externo
             calor_kw = (u.outs[0].H - u.ins[0].H) / 3600
-            tipo = "Recuperación Interna"
+            tipo_servicio = "Recuperación Interna"
+
+    # Caso 2: Equipos con servicios auxiliares (HXutility, Flash, etc.)
+    # Accedemos a la lista de 'heat_utilities' y sumamos sus duties
+        elif hasattr(u, "heat_utilities") and u.heat_utilities:
+        # Sumamos el duty de todos los agentes (vapor, agua, etc.)
+        # El duty en BioSTEAM está en kJ/hr, dividimos entre 3600 para kW
+            calor_kw = sum([hu.duty for hu in u.heat_utilities]) / 3600
         
-        # HXutility: Servicios auxiliares (W220, W310)
-        elif isinstance(u, bst.HXutility):
-            # Acceso correcto al duty de la utilidad
-            calor_kw = u.duty / 3600
-            if calor_kw > 0: tipo = "Calentamiento (Vapor)"
-            elif calor_kw < 0: tipo = "Enfriamiento (Agua)"
+            if calor_kw > 0.1: 
+                tipo_servicio = "Calentamiento (Vapor)"
+            elif calor_kw < -0.1: 
+                tipo_servicio = "Enfriamiento (Agua)"
 
-        # Bombas y equipos con consumo eléctrico
-        potencia = u.power_utility.rate if u.power_utility else 0.0
+    # Potencia Eléctrica (Bombas)
+    potencia = 0.0
+    if hasattr(u, "power_utility") and u.power_utility:
+        potencia = u.power_utility.rate # Ya viene en kW
 
-        if abs(calor_kw) > 0.1:
-            datos_en.append({"Equipo": u.ID, "Tipo": tipo, "Energía Térmica (kW)": round(calor_kw, 2)})
-        if potencia > 0.1:
-            datos_en.append({"Equipo": u.ID, "Tipo": "Electricidad", "Potencia (kW)": round(potencia, 2)})
-            
-    df_en = pd.DataFrame(datos_en)
+    # Solo agregamos si hay consumo significativo
+    if abs(calor_kw) > 0.01:
+        datos_en.append({
+            "ID Equipo": u.ID,
+            "Función": tipo_servicio,
+            "Energía Térmica (kW)": f"{calor_kw:.2f}",
+        })
+    if potencia > 0.01:
+        datos_en.append({
+            "ID Equipo": u.ID,
+            "Función": "Motor bomba",
+            "Energía eléctrica (kW)": f"{potencia:.2f}"
+        })
 
+df_en = pd.DataFrame(datos_en)
+
+        
     # --- Economía (TEA Didáctico original adaptado) ---
     class TEA_Didactico(bst.TEA):
         def _DPI(self, installed_equipment_cost): return self.purchase_cost
