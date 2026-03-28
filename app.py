@@ -101,4 +101,38 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, pres_mosto, T_flash, P_f
     precio_v = tea.solve_price(producto)
     
     ind_econ = {"Costo Producción ($/kg)": round(costo_p, 3), "Precio Venta Meta ($/kg)": round(precio_v, 3),
-                "NPV (MUSD)": round(tea.NPV/1e6, 2), "ROI (%)": round(tea
+                "NPV (MUSD)": round(tea.NPV/1e6, 2), "ROI (%)": round(tea.ROI*100, 1)}
+
+    # PFD
+    p_path = f"pfd_{uuid.uuid4().hex[:8]}.png"
+    try:
+        eth_sys.diagram(file=p_path.replace(".png", ""), format="png", display=False)
+    except:
+        p_path = None
+
+    return df_mat, df_en, ind_econ, p_path, None
+
+# 3. INTERFAZ
+st.sidebar.header("Parámetros")
+f_w = st.sidebar.slider("Agua (kg/h)", 500, 2000, 900)
+f_e = st.sidebar.slider("Etanol (kg/h)", 50, 300, 100)
+t_f = st.sidebar.slider("Temp Flash (°C)", 80, 110, 92)
+
+if st.sidebar.button("Simular"):
+    dm, de, ec, pf, err = correr_simulacion(f_w, f_e, 25, 1, t_f, 1, 0.085, 0.025, 0.0005, 0.05)
+    if err: st.error(err)
+    else:
+        if pf and os.path.exists(pf):
+            st.image(pf)
+            os.remove(pf)
+        c1, c2 = st.columns(2)
+        with c1: st.subheader("Materia"); st.dataframe(dm); st.subheader("Economía"); st.table(pd.DataFrame(list(ec.items())))
+        with c2: st.subheader("Energía"); st.dataframe(de)
+        
+        # IA
+        st.divider()
+        key = st.secrets.get("GEMINI_API_KEY")
+        if key and st.button("Consultar IA"):
+            genai.configure(api_key=key)
+            m = genai.GenerativeModel('gemini-pro')
+            st.info(m.generate_content(f"Analiza la viabilidad de este proceso: {ec}").text)
