@@ -1,0 +1,6 @@
+biosteam
+thermosteam
+pandas
+streamlit
+google-generativeai
+Pillow
