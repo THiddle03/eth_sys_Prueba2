@@ -1,29 +1,31 @@
-import streamlit as st
+iimport streamlit as st
 import biosteam as bst
 import thermosteam as tmo
 import pandas as pd
 import google.generativeai as genai
 from PIL import Image
 import os
-
-# Configuración de la página Streamlit (debe ser lo primero)
-st.set_page_config(page_title="Simulador de Bioetanol Didáctico", layout="wide")
+import uuid
 
 # =================================================================
-# 1. ENCAPSULAMIENTO DE LA LÓGICA DE BIOSTEAM
+# 1. CONFIGURACIÓN DE LA PÁGINA
 # =================================================================
-# Esta función crea y simula el proceso desde cero cada vez que se llama.
+st.set_page_config(page_title="BioSTEAM Web Simulator", layout="wide")
+
+# =================================================================
+# 2. FUNCIÓN MAESTRA DE SIMULACIÓN
+# =================================================================
 def correr_simulacion(flow_water, flow_eth, temp_mosto, pres_mosto, T_flash, P_flash, 
                       precio_elec, precio_vapor, precio_agua, precio_mp):
     
-    # IMPORTANTE: Limpiar el flowsheet anterior para evitar errores de ID duplicado
+    # IMPORTANTE: Limpiar el flowsheet para que Streamlit no duplique IDs al recargar
     bst.main_flowsheet.clear()
     
-    # Definimos los compuestos químicos (localmente)
+    # Configuración de compuestos y termodinámica
     chemicals = tmo.Chemicals(["Water", "Ethanol"])
     bst.settings.set_thermo(chemicals)
 
-    # --- Configuración de Precios Económicos ---
+    # Configuración global de precios (Utilities)
     bst.PowerUtility.price = precio_elec # $/kWh
     
     vapor = bst.HeatUtility.get_agent("low_pressure_steam")
@@ -32,21 +34,16 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, pres_mosto, T_flash, P_f
     agua = bst.HeatUtility.get_agent("cooling_water")
     agua.heat_transfer_price = precio_agua # $/MJ
 
-    # =================================================================
-    # 2. DEFINICIÓN DE CORRIENTES Y EQUIPOS
-    # =================================================================
-    
-    # Alimentación (usando parámetros dinámicos)
+    # --- DEFINICIÓN DE CORRIENTES ---
     mosto = bst.Stream("1_MOSTO",
                        Water=flow_water, Ethanol=flow_eth, units="kg/hr",
-                       T=temp_mosto + 273.15, # C to K
-                       P=pres_mosto * 101325) # atm to Pa
-    mosto.price = precio_mp # $/kg
+                       T=temp_mosto + 273.15, 
+                       P=pres_mosto * 101325)
+    mosto.price = precio_mp
 
-    # Corriente de reciclo vacía inicialmente
     vinazas_retorno = bst.Stream("Vinazas_Retorno", T=95+273.15, P=3*101325)
 
-    # Equipos
+    # --- DEFINICIÓN DE EQUIPOS ---
     P100 = bst.Pump("P100", ins=mosto, P=4*101325)
     
     W210 = bst.HXprocess("W210", ins=(P100-0, vinazas_retorno), 
@@ -58,92 +55,60 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, pres_mosto, T_flash, P_f
     
     V100 = bst.IsenthalpicValve("V100", ins=W220-0, outs="Mezcla_Bifasica", P=P_flash*101325)
 
-    # Flash (parámetros dinámicos)
     V1 = bst.Flash("V1", ins=V100-0, outs=("Vapor_caliente", "Vinazas"), P=P_flash*101325, Q=0)
 
-    # Corrección de acceso a energía: El condensador usa utility
     W310 = bst.HXutility("W310", ins=V1-0, outs="Producto_Final", T=25+273.15)
     producto = W310.outs[0]
-    producto.price = 1.2 # $/kg fijo para este ejemplo
+    producto.price = 1.2 # Precio de venta fijo
 
     P200 = bst.Pump("P200", ins=V1-1, outs=vinazas_retorno, P=3*101325)
 
-    # =================================================================
-    # 3. SIMULACIÓN
-    # =================================================================
+    # --- SIMULACIÓN DEL SISTEMA ---
     eth_sys = bst.System("planta_etanol", path=(P100, W210, W220, V100, V1, W310, P200))
     
-    sim_exitosa = True
     try:
         eth_sys.simulate()
     except Exception as e:
-        sim_exitosa = False
-        return None, None, None, None, f"Error de convergencia: {e}"
+        return None, None, None, None, f"Error en simulación: {e}"
 
-    # =================================================================
-    # 4. GENERACIÓN DE REPORTES (Lógica original adaptada)
-    # =================================================================
-    # --- Materia ---
+    # --- GENERACIÓN DE REPORTE DE MATERIA ---
     datos_mat = []
     for s in eth_sys.streams:
-        if s.F_mass > 0.01: # Filtro robusto
+        if s.F_mass > 0.001:
             datos_mat.append({
                 "Corriente": s.ID,
                 "Temp (°C)": round(s.T - 273.15, 2),
-                "Presión (bar)": round(s.P / 1e5, 2),
                 "Flujo (kg/h)": round(s.F_mass, 2),
-                "% Etanol": f"{s.imass['Ethanol'] / s.F_mass:.1%}" if s.F_mass > 0 else "0%",
-                "% Agua": f"{s.imass['Water'] / s.F_mass:.1%}" if s.F_mass > 0 else "0%"
+                "% Etanol": f"{(s.imass['Ethanol']/s.F_mass if s.F_mass >0 else 0):.1%}",
+                "% Agua": f"{(s.imass['Water']/s.F_mass if s.F_mass > 0 else 0):.1%}"
             })
     df_mat = pd.DataFrame(datos_mat)
 
-    # ---- PARTE 2: TABLA DE ENERGÍA (Versión BioSTEAM 11.0+) -----
+    # --- GENERACIÓN DE REPORTE DE ENERGÍA (CORREGIDO) ---
     datos_en = []
     for u in eth_sys.units:
         calor_kw = 0.0
-        tipo_servicio = "-"
-
-    # Caso 1: Recuperación interna (HXprocess)
+        tipo = "-"
+        
         if isinstance(u, bst.HXprocess):
-        # Aquí calculamos por diferencia de entalpía porque no hay servicio externo
             calor_kw = (u.outs[0].H - u.ins[0].H) / 3600
-            tipo_servicio = "Recuperación Interna"
-
-    # Caso 2: Equipos con servicios auxiliares (HXutility, Flash, etc.)
-    # Accedemos a la lista de 'heat_utilities' y sumamos sus duties
+            tipo = "Recuperación Interna"
         elif hasattr(u, "heat_utilities") and u.heat_utilities:
-        # Sumamos el duty de todos los agentes (vapor, agua, etc.)
-        # El duty en BioSTEAM está en kJ/hr, dividimos entre 3600 para kW
+            # Sumatoria de duties de todos los agentes de servicio
             calor_kw = sum([hu.duty for hu in u.heat_utilities]) / 3600
-        
-            if calor_kw > 0.1: 
-                tipo_servicio = "Calentamiento (Vapor)"
-            elif calor_kw < -0.1: 
-                tipo_servicio = "Enfriamiento (Agua)"
+            if calor_kw > 0.1: tipo = "Calentamiento (Vapor)"
+            elif calor_kw < -0.1: tipo = "Enfriamiento (Agua)"
 
-    # Potencia Eléctrica (Bombas)
-    potencia = 0.0
-    if hasattr(u, "power_utility") and u.power_utility:
-        potencia = u.power_utility.rate # Ya viene en kW
+        potencia = u.power_utility.rate if u.power_utility else 0.0
 
-    # Solo agregamos si hay consumo significativo
-    if abs(calor_kw) > 0.01:
-        datos_en.append({
-            "ID Equipo": u.ID,
-            "Función": tipo_servicio,
-            "Energía Térmica (kW)": f"{calor_kw:.2f}",
-        })
-    if potencia > 0.01:
-        datos_en.append({
-            "ID Equipo": u.ID,
-            "Función": "Motor bomba",
-            "Energía eléctrica (kW)": f"{potencia:.2f}"
-        })
+        if abs(calor_kw) > 0.01:
+            datos_en.append({"Equipo": u.ID, "Función": tipo, "Calor (kW)": round(calor_kw, 2)})
+        if potencia > 0.01:
+            datos_en.append({"Equipo": u.ID, "Función": "Motor Eléctrico", "Potencia (kW)": round(potencia, 2)})
+            
+    df_en = pd.DataFrame(datos_en)
 
-df_en = pd.DataFrame(datos_en)
-
-        
-    # --- Economía (TEA Didáctico original adaptado) ---
+    # --- ANÁLISIS ECONÓMICO (TEA) ---
     class TEA_Didactico(bst.TEA):
         def _DPI(self, installed_equipment_cost): return self.purchase_cost
         def _TDC(self, DPI): return DPI
@@ -152,33 +117,27 @@ df_en = pd.DataFrame(datos_en)
         def _FOC(self, FCI): return 0.0
         @property
         def VOC(self):
-            mat = getattr(self.system, 'material_cost', 0)
-            util = getattr(self.system, 'utility_cost', 0)
-            return mat + util
+            return getattr(self.system, 'material_cost', 0) + getattr(self.system, 'utility_cost', 0)
 
     tea = TEA_Didactico(system=eth_sys, IRR=0.15, duration=(2025, 2045), income_tax=0.3,
                         depreciation="MACRS7", construction_schedule=(0.4, 0.6), operating_days=330,
                         lang_factor=4.0, WC_over_FCI=0.05)
     
-    # Cálculos económicos
     tea.IRR = 0.0
     costo_prod = tea.solve_price(producto)
     tea.IRR = 0.15
     precio_venta = tea.solve_price(producto)
     
     ind_econ = {
-        "Costo Producción ($/kg)": costo_prod,
-        "Precio Venta Meta ($/kg)": precio_venta,
-        "NPV (MUSD)": tea.NPV / 1e6,
-        "PBP (Años)": tea.PBP,
-        "ROI (%)": tea.ROI * 100
+        "Costo Producción ($/kg)": round(costo_prod, 3),
+        "Precio Venta Meta ($/kg)": round(precio_venta, 3),
+        "NPV (MUSD)": round(tea.NPV / 1e6, 2),
+        "PBP (Años)": round(tea.PBP, 1),
+        "ROI (%)": round(tea.ROI * 100, 1)
     }
 
-    # --- Diagrama (PFD) ---
-    # Solución para PFD en Web: Generar un archivo temporal único
-    import uuid
-    diag_id = str(uuid.uuid4())[:8]
-    pfd_filename = f"pfd_{diag_id}"
+    # --- DIAGRAMA (PFD) ---
+    pfd_filename = f"pfd_{uuid.uuid4().hex[:8]}"
     try:
         eth_sys.diagram(file=pfd_filename, format="png", display=False)
         pfd_path = pfd_filename + ".png"
@@ -188,122 +147,53 @@ df_en = pd.DataFrame(datos_en)
     return df_mat, df_en, ind_econ, pfd_path, None
 
 # =================================================================
-# 5. INTEGRACIÓN DE IA (GEMINI)
+# 3. INTERFAZ STREAMLIT
 # =================================================================
-def consultar_tutor_ia(df_materia, ind_econ, api_key):
-    if not api_key:
-        return "⚠️ Por favor configura la GEMINI_API_KEY en los Secrets de Streamlit."
-    
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-pro')
-    
-    # Convertir datos relevantes a texto para el prompt
-    prod_final = df_materia[df_materia['Corriente'] == 'Producto_Final'].to_string()
-    
-    prompt = f"""
-    Actúa como un profesor experto en Ingeniería Química. Analiza los siguientes resultados de una simulación BioSTEAM de una separación Flash Agua-Etanol.
-    
-    Datos del Producto Final:
-    {prod_final}
-    
-    Indicadores Económicos:
-    {ind_econ}
-    
-    Por favor, proporciona una interpretación educativa de estos resultados para un estudiante.
-    1. Explica si la separación fue efectiva basándote en la pureza del etanol.
-    2. Analiza la viabilidad económica (NPV, ROI) y qué factor (materia prima, utilidades) influye más.
-    3. Sugiere una mejora técnica al proceso (ej. usar destilación en lugar de solo flash).
-    Mantén un tono didáctico y claro.
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Error al contactar a Gemini: {e}"
+st.title("🧪 Simulador BioSTEAM + IA Gemini")
 
-# =================================================================
-# 6. INTERFAZ DE USUARIO (STREAMLIT)
-# =================================================================
-st.title("🔬 Simulador Interactivo: Separación Flash de Bioetanol")
-st.markdown("---")
+# Sidebar
+st.sidebar.header("Configuración")
+f_w = st.sidebar.slider("Agua (kg/h)", 500, 2000, 900)
+f_e = st.sidebar.slider("Etanol (kg/h)", 50, 300, 100)
+t_f = st.sidebar.slider("Temp. Flash (°C)", 80, 110, 92)
+p_f = st.sidebar.slider("Presión Flash (atm)", 0.5, 2.0, 1.0)
 
-# --- Barra Lateral (Inputs) ---
-st.sidebar.header("⚙️ Parámetros de Proceso")
-f_agua = st.sidebar.slider("Flujo Agua Alim. (kg/h)", 500, 2000, 900)
-f_eth = st.sidebar.slider("Flujo Etanol Alim. (kg/h)", 50, 300, 100)
-t_mosto = st.sidebar.number_input("Temp. Alimentación (°C)", value=25)
-p_mosto = st.sidebar.number_input("Presión Alimentación (atm)", value=1.0)
+st.sidebar.subheader("Precios")
+p_v = st.sidebar.number_input("Vapor ($/MJ)", value=0.025, format="%.4f")
+p_mp = st.sidebar.number_input("Materia Prima ($/kg)", value=0.05, format="%.3f")
 
-st.sidebar.markdown("---")
-st.sidebar.header("🔥 Condiciones Flash V-1")
-t_flash = st.sidebar.slider("Temperatura Flash (°C)", 80, 110, 92)
-p_flash = st.sidebar.slider("Presión Flash (atm)", 0.5, 2.0, 1.0)
-
-st.sidebar.markdown("---")
-st.sidebar.header("💰 Parámetros Económicos")
-p_elec = st.sidebar.number_input("Precio Electricidad ($/kWh)", value=0.085, format="%.4f")
-p_vapor = st.sidebar.number_input("Precio Vapor ($/MJ)", value=0.025, format="%.4f")
-p_agua_c = st.sidebar.number_input("Precio Agua Enfr. ($/MJ)", value=0.0005, format="%.5f")
-p_mp = st.sidebar.number_input("Precio Materia Prima ($/kg)", value=0.05, format="%.3f")
-
-# Botón principal
-run_sim = st.sidebar.button("Correr Simulación", type="primary")
-
-# --- Cuerpo Principal ---
-if run_sim:
-    with st.spinner('Ejecutando balance de materia y energía en BioSTEAM...'):
-        df_mat, df_en, econ, pfd_file, error = correr_simulacion(
-            f_agua, f_eth, t_mosto, p_mosto, t_flash, p_flash,
-            p_elec, p_vapor, p_agua_c, p_mp
-        )
+if st.sidebar.button("Simular Proceso", type="primary"):
+    df_m, df_e_en, econ, pfd, err = correr_simulacion(f_w, f_e, 25, 1, t_f, p_f, 0.085, p_v, 0.0005, p_mp)
     
-    if error:
-        st.error(error)
+    if err:
+        st.error(err)
     else:
-        st.success("✅ Simulación finalizada exitosamente.")
-        
-        # PFD
-        st.header("🖼️ Diagrama de Flujo del Proceso (PFD)")
-        if pfd_file and os.path.exists(pfd_file):
-            image = Image.open(pfd_file)
-            st.image(image, caption="PFD generado por BioSTEAM", use_column_width=True)
-            os.remove(pfd_file) # Limpieza de archivo temporal
-        else:
-            st.warning("No se pudo generar el diagrama.")
+        # Mostrar PFD
+        if pfd and os.path.exists(pfd):
+            st.image(pfd, caption="Diagrama de Flujo")
+            os.remove(pfd)
 
-        # Resultados
         col1, col2 = st.columns(2)
-        
         with col1:
-            st.subheader("📊 Balance de Materia")
-            st.dataframe(df_mat, use_container_width=True)
-            
-            st.subheader("📈 Indicadores Económicos (TEA)")
-            # Convertir dict a DataFrame para mejor visualización
-            df_econ = pd.DataFrame(list(econ.items()), columns=['Indicador', 'Valor'])
-            st.table(df_econ)
-
+            st.subheader("Balances")
+            st.dataframe(df_m)
+            st.subheader("Economía")
+            st.table(pd.DataFrame(list(econ.items()), columns=["Métrica", "Valor"]))
+        
         with col2:
-            st.subheader("⚡ Consumo de Energía")
-            st.dataframe(df_en, use_container_width=True)
+            st.subheader("Energía")
+            st.dataframe(df_e_en)
             
-            # Sección de IA
-            st.markdown("---")
-            st.subheader("🤖 Tutor de Ingeniería (Gemini AI)")
-            
-            # Obtener API Key de los Secrets
+            # IA Gemini
+            st.divider()
+            st.subheader("🤖 Tutor IA")
             api_key = st.secrets.get("GEMINI_API_KEY")
-            
-            if st.button("Pedir interpretación a la IA"):
-                with st.spinner('Consultando al tutor experto...'):
-                    respuesta_ia = consultar_tutor_ia(df_mat, econ, api_key)
-                    st.markdown(respuesta_ia)
-
-else:
-    st.info("👈 Ajusta los parámetros en la barra lateral y haz clic en 'Correr Simulación' para ver los resultados.")
-    # Imagen de bienvenida o descripción general
-    st.markdown("""
-    Esta aplicación permite simular un proceso de separación flash de una mezcla Agua-Etanol utilizando la librería científica BioSTEAM.
-    Puedes modificar las condiciones de operación y los precios de mercado para ver cómo afectan la pureza del producto y la rentabilidad del proyecto en tiempo real.
-    """)
+            if api_key:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-pro')
+                prompt = f"Analiza estos resultados de simulación de etanol: {econ}. Explica si es rentable y por qué."
+                if st.button("Consultar IA"):
+                    res = model.generate_content(prompt)
+                    st.write(res.text)
+            else:
+                st.info("Configura GEMINI_API_KEY en Secrets para usar la IA.")
