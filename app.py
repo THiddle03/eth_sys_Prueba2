@@ -177,7 +177,7 @@ def consultar_tutor_ia(df_materia, ind_econ, api_key):
         return "⚠️ Por favor configura la GEMINI_API_KEY en los Secrets de Streamlit."
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     
     # Convertir datos relevantes a texto para el prompt
     prod_final = df_materia[df_materia['Corriente'] == 'Producto_Final'].to_string()
