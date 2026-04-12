@@ -168,7 +168,7 @@ if 'resultados' in st.session_state:
                 if user_question:
                     with st.spinner('Analizando...'):
                         genai.configure(api_key=api_key)
-                        model = genai.GenerativeModel('gemini-pro')
+                        model = genai.GenerativeModel('gemini-2.5-pro')
                         contexto = f"""
                         Eres un experto en ingeniería química.
                         Resultados: {dm.to_string()}
