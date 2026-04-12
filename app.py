@@ -204,7 +204,7 @@ if 'resultados' in st.session_state:
     st.subheader("📁 Documentación Técnica del Proceso (ISO)")
     
     # Creamos dos pestañas para organizar los PDFs
-    tab1, tab2 = st.tabs(["Diagrama de Bloques (DB)", "Borrador DFP"])
+    tab1, tab2 = st.tabs(["Diagrama de Bloques (DB)", "DFP"])
 
     with tab1:
         # Enlace de vista previa del PDF 1
