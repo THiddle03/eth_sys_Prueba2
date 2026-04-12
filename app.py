@@ -100,13 +100,21 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
         "ROI (%)": round(tea.ROI*100, 1),
         "PBP (Años)": round(tea.PBP, 2) # Parámetro agregado
     }
-                        
+
+    p_path = f"pfd_{uuid.uuid4().hex[:8]}.png"
+    try:
+        eth_sys.diagram(file=p_path.replace(".png", ""), format="png", display=False)
+    except:
+        p_path = None
+
+    return pd.DataFrame(datos_mat), pd.DataFrame(datos_en), ind_econ, p_path, None
+
 # 3. INTERFAZ DE USUARIO
 st.title("🧪 Simulador Bioetanol: Control Termodinámico y Económico")
 
 # BARRA LATERAL
 st.sidebar.header("🌡️ Parámetros Proceso")
-f_w = st.sidebar.slider("Agua (kg/h)", 100, 2000, 900)
+f_w = st.sidebar.slider("Agua (kg/h)", 500, 2000, 900)
 f_e = st.sidebar.slider("Etanol (kg/h)", 50, 300, 100)
 t_mosto = st.sidebar.slider("Temp. Mosto (°C)", 10, 50, 25)
 t_flash = st.sidebar.slider("Temp. W220 (°C)", 70, 120, 92)
@@ -115,12 +123,12 @@ p_flash = st.sidebar.slider("Presión (atm)", 0.1, 3.0, 1.0, step=0.1)
 st.sidebar.divider()
 st.sidebar.header("💰 Parámetros Económicos")
 # Nuevos Sliders Solicitados
-p_elec = st.sidebar.slider("Precio Electricidad ($/kWh)", 0.0, 0.25, 0.085, step=0.005)
+p_elec = st.sidebar.slider("Precio Electricidad ($/kWh)", 0.05, 0.25, 0.085, step=0.005)
 p_agua_c = st.sidebar.slider("Precio Agua Enfr. ($/MJ)", 0.0001, 0.01, 0.0005, step=0.0001, format="%.4f")
 # Sliders mantenidos
 p_vapor = st.sidebar.slider("Precio Vapor ($/MJ)", 0.01, 0.10, 0.025, step=0.005)
-p_mp = st.sidebar.slider("Precio Materia Prima ($/kg)", 0.001, 0.50, 0.05, step=0.005)
-p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 25.0, 1.2, step=1.0)
+p_mp = st.sidebar.slider("Precio Materia Prima ($/kg)", 0.01, 0.50, 0.05, step=0.01)
+p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 3.0, 1.2, step=0.1)
 
 # Lógica de Simulación
 if st.sidebar.button("Simular Proceso", type="primary"):
