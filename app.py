@@ -132,7 +132,7 @@ p_elec = st.sidebar.slider("Precio Elec. ($/kWh)", 0.05, 0.25, 0.085, step=0.005
 p_vapor = st.sidebar.slider("Precio Vapor ($/MJ)", 0.01, 0.10, 0.025, step=0.005)
 p_agua_c = st.sidebar.slider("Precio Agua Enfr. ($/MJ)", 0.0001, 0.01, 0.0005, step=0.0001, format="%.4f")
 p_mp = st.sidebar.slider("Precio Materia Prima ($/kg)", 0.01, 0.50, 0.05, step=0.01)
-p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 10.0, 1.2, step=0.1)
+p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 3.0, 1.2, step=0.1)
 
 if st.sidebar.button("Simular Proceso", type="primary"):
     dm, de, ec, pf, err = correr_simulacion(f_w, f_e, t_mosto, t_flash, p_flash, 
