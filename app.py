@@ -139,7 +139,7 @@ if st.sidebar.button("Simular Proceso", type="primary"):
     else:
         st.session_state['resultados'] = (dm, de, ec, pf)
 
-    if pf and os.path.exists(pf):
+if pf and os.path.exists(pf):
         st.image(pf, caption="PFD del Sistema")
         
         st.write("### 📂 Documentación ISO")
