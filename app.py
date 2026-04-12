@@ -141,6 +141,8 @@ if st.sidebar.button("Simular Proceso", type="primary"):
 
 # ... (Todo el código anterior de simulación y lógica se mantiene igual)
 
+# ... (Todo el código anterior de simulación se mantiene igual)
+
 # MOSTRAR RESULTADOS
 if 'resultados' in st.session_state:
     dm, de, ec, pf = st.session_state['resultados']
@@ -148,31 +150,28 @@ if 'resultados' in st.session_state:
     if pf and os.path.exists(pf):
         st.image(pf, caption="PFD del Sistema")
         
-        # --- NUEVOS BOTONES DE ENLACES EXTERNOS ---
-        col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+        # --- NUEVA FORMA NATIVA DE AGREGAR LINKS ---
+        st.write("### 📂 Documentación ISO")
+        col_btn1, col_btn2 = st.columns(2)
         
         with col_btn1:
-            url_db = "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link"
-            st.markdown(f'''
-                <a href="{url_db}" target="_blank">
-                    <button style="width:100%; height:40px; border-radius:5px; background-color:#F0F2F6; border:1px solid #d3d3d3; cursor:pointer;">
-                        DB ISO 📄
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.link_button(
+                "DB ISO 📄", 
+                "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link",
+                use_container_width=True
+            )
 
         with col_btn2:
-            url_dfp = "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link"
-            st.markdown(f'''
-                <a href="{url_dfp}" target="_blank">
-                    <button style="width:100%; height:40px; border-radius:5px; background-color:#F0F2F6; border:1px solid #d3d3d3; cursor:pointer;">
-                        DFP ISO 📄
-                    </button>
-                </a>
-            ''', unsafe_allow_html=True)
+            st.link_button(
+                "DFP ISO 📄", 
+                "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link",
+                use_container_width=True
+            )
         # ------------------------------------------
 
     col1, col2 = st.columns(2)
+    # ... (Resto del código de tablas y Tutor IA)
+        # ------------------------------------------
     with col1:
         st.subheader("📊 Balances de Materia")
         st.dataframe(dm, use_container_width=True)
