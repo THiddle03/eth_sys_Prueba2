@@ -139,33 +139,35 @@ if st.sidebar.button("Simular Proceso", type="primary"):
     else:
         st.session_state['resultados'] = (dm, de, ec, pf)
 
+
 if pf and os.path.exists(pf):
-        st.image(pf, caption="PFD del Sistema")
+    st.image(pf, caption="PFD del Sistema")
         
-        st.write("### 📂 Documentación ISO")
-        col_btn1, col_btn2 = st.columns(2)
+    st.write("### 📂 Documentación ISO")
+    col_btn1, col_btn2 = st.columns(2)
         
-        with col_btn1:
+    with col_btn1:
             # Opción A: Botón Nativo (Requiere Streamlit 1.27+)
-            try:
-                st.link_button(
+        try:
+            st.link_button(
                     "DB ISO 📄", 
                     "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link",
                     use_container_width=True
                 )
-            except AttributeError:
+        except AttributeError:
                 # Opción B: Enlace de respaldo si la versión es vieja
-                st.markdown('[**➡️ Abrir DB ISO (Drive)**](https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link)')
+            st.markdown('[**➡️ Abrir DB ISO (Drive)**](https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link)')
 
-        with col_btn2:
-            try:
-                st.link_button(
+    with col_btn2:
+        try:
+            st.link_button(
                     "DFP ISO 📄", 
                     "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link",
                     use_container_width=True
                 )
-            except AttributeError:
+        except AttributeError:
                 st.markdown('[**➡️ Abrir DFP ISO (Drive)**](https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link)')
+  
 # ... (Todo el código anterior de simulación y lógica se mantiene igual)
 
 # MOSTRAR RESULTADOS
