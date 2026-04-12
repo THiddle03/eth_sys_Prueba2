@@ -139,11 +139,6 @@ if st.sidebar.button("Simular Proceso", type="primary"):
     else:
         st.session_state['resultados'] = (dm, de, ec, pf)
 
-# ... (Todo el código anterior de simulación y lógica se mantiene igual)
-
-# MOSTRAR RESULTADOS
-# ... (Dentro de tu bloque 'if resultados in st.session_state')
-
     if pf and os.path.exists(pf):
         st.image(pf, caption="PFD del Sistema")
         
@@ -171,6 +166,9 @@ if st.sidebar.button("Simular Proceso", type="primary"):
                 )
             except AttributeError:
                 st.markdown('[**➡️ Abrir DFP ISO (Drive)**](https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link)')
+# ... (Todo el código anterior de simulación y lógica se mantiene igual)
+
+# MOSTRAR RESULTADOS
         # ------------------------------------------
 
     col1, col2 = st.columns(2)
