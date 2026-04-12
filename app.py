@@ -7,7 +7,7 @@ import os
 import uuid
 
 # 1. CONFIGURACIÓN DE PÁGINA
-st.set_page_config(page_title="Simulador Bioetanol Pro v2", layout="wide")
+st.set_page_config(page_title="Simulador Bioetanol Pro v3", layout="wide")
 
 # 2. FUNCIÓN DE SIMULACIÓN
 def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash, 
@@ -25,7 +25,6 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     agua.heat_transfer_price = precio_agua
 
     # --- CORRIENTES ---
-    # Slider 1: temp_mosto (Alimentación)
     mosto = bst.Stream("1_MOSTO", Water=flow_water, Ethanol=flow_eth, units="kg/hr",
                        T=temp_mosto + 273.15, P=101325)
     mosto.price = precio_mp
@@ -36,15 +35,14 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     W210 = bst.HXprocess("W210", ins=(P100-0, vinazas_retorno), outs=("3_Mosto_Pre", "Drenaje"), phase0="l", phase1="l")
     W210.outs[0].T = 85 + 273.15
     
-    # Slider 2: T_flash (Salida de W220 / Entrada al Flash)
     W220 = bst.HXutility("W220", ins=W210-0, outs="Mezcla", T=T_flash+273.15)
     
+    # NUEVO: Slider de Presión aplicado a V100 y V1
     V100 = bst.IsenthalpicValve("V100", ins=W220-0, outs="Mezcla_Bifasica", P=P_flash*101325)
     V1 = bst.Flash("V1", ins=V100-0, outs=("Vapor_caliente", "Vinazas"), P=P_flash*101325, Q=0)
-    W310 = bst.HXutility("W310", ins=V1-0, outs="Producto_Final", T=25+273.15)
     
+    W310 = bst.HXutility("W310", ins=V1-0, outs="Producto_Final", T=25+273.15)
     producto = W310.outs[0]
-    # Slider 3: precio_etanol (Venta)
     producto.price = precio_etanol
 
     P200 = bst.Pump("P200", ins=V1-1, outs=vinazas_retorno, P=3*101325)
@@ -57,11 +55,21 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     except Exception as e:
         return None, None, None, None, f"Error: {e}"
 
-    # --- REPORTES ---
-    datos_mat = [{"Corriente": s.ID, "Temp (°C)": round(s.T-273.15, 2), "Flujo (kg/h)": round(s.F_mass, 2), 
-                  "% Etanol": f"{(s.imass['Ethanol']/s.F_mass if s.F_mass>0 else 0):.1%}"} 
-                 for s in eth_sys.streams if s.F_mass > 0.01]
-    
+    # --- REPORTE MATERIA (CON COLUMNA DE PRESIÓN) ---
+    datos_mat = []
+    for s in eth_sys.streams:
+        if s.F_mass > 0.01:
+            datos_mat.append({
+                "Corriente": s.ID,
+                "Temp (°C)": round(s.T - 273.15, 2),
+                "Presión (bar)": round(s.P / 100000, 3), # Conversión de Pa a bar
+                "Flujo (kg/h)": round(s.F_mass, 2),
+                "% Etanol": f"{(s.imass['Ethanol']/s.F_mass if s.F_mass > 0 else 0):.1%}",
+                "% Agua": f"{(s.imass['Water']/s.F_mass if s.F_mass > 0 else 0):.1%}"
+            })
+    df_mat = pd.DataFrame(datos_mat)
+
+    # --- REPORTE ENERGÍA ---
     datos_en = []
     for u in eth_sys.units:
         calor = sum([hu.duty for hu in u.heat_utilities])/3600 if hasattr(u, "heat_utilities") else 0
@@ -91,7 +99,7 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     
     ind_econ = {
         "Costo Producción ($/kg)": round(costo_p, 3),
-        "Precio Venta Actual ($/kg)": round(precio_etanol, 3),
+        "Precio Venta ($/kg)": round(precio_etanol, 3),
         "NPV (MUSD)": round(tea.NPV/1e6, 2),
         "ROI (%)": round(tea.ROI*100, 1),
         "PBP (Años)": round(tea.PBP, 2)
@@ -103,36 +111,31 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     except:
         p_path = None
 
-    return pd.DataFrame(datos_mat), pd.DataFrame(datos_en), ind_econ, p_path, None
+    return df_mat, pd.DataFrame(datos_en), ind_econ, p_path, None
 
 # 3. INTERFAZ DE USUARIO
-st.title("🧪 Simulador Bioetanol Pro: Control Total")
+st.title("🧪 Simulador Bioetanol Pro: Control Termodinámico")
 
 # BARRA LATERAL
 st.sidebar.header("🌡️ Parámetros de Proceso")
 f_w = st.sidebar.slider("Flujo Agua (kg/h)", 500, 2000, 900)
 f_e = st.sidebar.slider("Flujo Etanol (kg/h)", 50, 300, 100)
-
-# NUEVO SLIDER 1: Temperatura Mosto
 t_mosto = st.sidebar.slider("Temp. Alimentación Mosto (°C)", 10, 50, 25)
+t_flash = st.sidebar.slider("Temp. Salida W220 (°C)", 70, 120, 92)
 
-# NUEVO SLIDER 2: Temperatura Mezcla (Salida W220)
-t_flash = st.sidebar.slider("Temp. Salida Intercambiador W220 (°C)", 70, 120, 92)
+# NUEVO SLIDER: Presión de V100 y V1
+p_flash = st.sidebar.slider("Presión del Separador (atm)", 0.1, 3.0, 1.0, step=0.1)
 
 st.sidebar.divider()
 st.sidebar.header("💰 Parámetros Económicos")
-
-# Precios de insumos
 p_elec = st.sidebar.slider("Precio Elec. ($/kWh)", 0.05, 0.25, 0.085, step=0.005)
 p_vapor = st.sidebar.slider("Precio Vapor ($/MJ)", 0.01, 0.10, 0.025, step=0.005)
 p_agua_c = st.sidebar.slider("Precio Agua Enfr. ($/MJ)", 0.0001, 0.01, 0.0005, step=0.0001, format="%.4f")
 p_mp = st.sidebar.slider("Precio Materia Prima ($/kg)", 0.01, 0.50, 0.05, step=0.01)
-
-# NUEVO SLIDER 3: Precio Etanol (Producto)
-p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 3.0, 1.2, step=0.1)
+p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 10.0, 1.2, step=0.1)
 
 if st.sidebar.button("Simular Proceso", type="primary"):
-    dm, de, ec, pf, err = correr_simulacion(f_w, f_e, t_mosto, t_flash, 1.0, 
+    dm, de, ec, pf, err = correr_simulacion(f_w, f_e, t_mosto, t_flash, p_flash, 
                                             p_elec, p_vapor, p_agua_c, p_mp, p_etanol)
     
     if err:
@@ -144,8 +147,9 @@ if st.sidebar.button("Simular Proceso", type="primary"):
             
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("📊 Balances")
-            st.dataframe(dm, use_container_width=True)
+            st.subheader("📊 Balances de Materia")
+            st.dataframe(dm, use_container_width=True) # Aquí ya incluye la columna 'Presión (bar)'
+            
             st.subheader("📈 Economía")
             st.table(pd.DataFrame(list(ec.items()), columns=["Indicador", "Valor"]))
             
@@ -158,6 +162,6 @@ if st.sidebar.button("Simular Proceso", type="primary"):
             key = st.secrets.get("GEMINI_API_KEY")
             if key and st.button("Analizar con IA"):
                 genai.configure(api_key=key)
-                m = genai.GenerativeModel('gemini-pro')
-                prompt = f"Analiza: Temp Mosto={t_mosto}C, Temp W220={t_flash}C, Precio Venta={p_etanol}$, Resultados={ec}."
+                m = genai.GenerativeModel('gemini-2.5-pro')
+                prompt = f"Analiza: T_flash={t_flash}C, P_flash={p_flash}atm. Resultados={ec}. Explica la relación entre presión y pureza."
                 st.info(m.generate_content(prompt).text)
