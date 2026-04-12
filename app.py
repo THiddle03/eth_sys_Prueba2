@@ -72,8 +72,8 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
         if abs(calor) > 0.1 or potencia > 0.1:
             datos_en.append({"Equipo": u.ID, "Calor (kW)": round(calor, 2), "Potencia (kW)": round(potencia, 2)})
 
-    # --- TEA ---
-    class TEA_Simple(bst.TEA):
+# --- TEA ROBUSTO (ACTUALIZADO) ---
+    class TEA_Robusto(bst.TEA):
         def _DPI(self, installed_equipment_cost): return self.purchase_cost
         def _TDC(self, DPI): return DPI
         def _FCI(self, TDC): return self.purchase_cost * self.lang_factor
@@ -92,21 +92,14 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     tea.IRR = 0.0
     costo_p = tea.solve_price(producto)
     
+    # Diccionario con los nuevos parámetros solicitados
     ind_econ = {
         "Costo Producción ($/kg)": round(costo_p, 3),
-        "Precio Venta ($/kg)": round(precio_etanol, 3),
+        "Precio Venta ($/kg)": round(precio_etanol, 3), # Parámetro agregado
         "NPV (MUSD)": round(tea.NPV/1e6, 2),
         "ROI (%)": round(tea.ROI*100, 1),
-        "PBP (Años)": round(tea.PBP, 2)
+        "PBP (Años)": round(tea.PBP, 2) # Parámetro agregado
     }
-
-    p_path = f"pfd_{uuid.uuid4().hex[:8]}.png"
-    try:
-        eth_sys.diagram(file=p_path.replace(".png", ""), format="png", display=False)
-    except:
-        p_path = None
-
-    return df_mat, pd.DataFrame(datos_en), ind_econ, p_path, None
                         
 # 3. INTERFAZ DE USUARIO
 st.title("🧪 Simulador Bioetanol: Control Termodinámico y Económico")
