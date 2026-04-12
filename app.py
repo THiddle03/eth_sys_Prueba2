@@ -142,35 +142,50 @@ if st.sidebar.button("Simular Proceso", type="primary"):
   
 # ... (Todo el código anterior de simulación y lógica se mantiene igual)
 
+# ... (Todo el código anterior de simulación y lógica se mantiene igual)
+
 # MOSTRAR RESULTADOS
 if 'resultados' in st.session_state:
     dm, de, ec, pf = st.session_state['resultados']
     
     if pf and os.path.exists(pf):
-        st.image(pf, caption="PFD del Sistema")
-     
-        # ------------------------------------------
+        st.image(pf, caption="PFD dinámico generado por la simulación")
 
+    # --- NUEVA SECCIÓN: VISUALIZACIÓN DE DIAGRAMAS PDF ESTÁTICOS ---
+    st.divider()
+    st.subheader("📁 Documentación Técnica del Proceso (ISO)")
+    
+    # Creamos dos pestañas para organizar los PDFs
+    tab1, tab2 = st.tabs(["Diagrama de Bloques (DB)", "Borrador DFP"])
+
+    with tab1:
+        # Enlace de vista previa del PDF 1
+        pdf_db = "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/preview"
+        st.markdown(f'<iframe src="{pdf_db}" width="100%" height="600px"></iframe>', unsafe_allow_html=True)
+
+    with tab2:
+        # Enlace de vista previa del PDF 2
+        pdf_dfp = "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/preview"
+        st.markdown(f'<iframe src="{pdf_dfp}" width="100%" height="600px"></iframe>', unsafe_allow_html=True)
+    # -------------------------------------------------------------
+
+    st.divider()
     col1, col2 = st.columns(2)
-    # ... (Resto del código de tablas y Tutor IA)
-    # ... (Resto del código de tablas y Tutor IA)
-        # ------------------------------------------
     with col1:
         st.subheader("📊 Balances de Materia")
         st.dataframe(dm, use_container_width=True)
-        
         st.subheader("📈 Economía")
-        # Se asegura de usar TEA_Robusto y mostrar PBP y Precio Venta
         st.table(pd.DataFrame(list(ec.items()), columns=["Indicador", "Valor"]))
         
     with col2:
         st.subheader("⚡ Energía")
         st.dataframe(de, use_container_width=True)
         
-        # --- TUTOR IA INTERACTIVO (Mismo código anterior) ---
+        # --- TUTOR IA INTERACTIVO ---
         st.divider()
         st.subheader("🤖 Tutor IA Interactivo")
         # ... (Resto del código del Tutor IA)
+        # --- TUTOR IA INTERACTIVO (Mismo código anterior) ---
         
         api_key = st.secrets.get("GEMINI_API_KEY")
         if api_key:
