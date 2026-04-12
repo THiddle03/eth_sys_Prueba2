@@ -151,23 +151,7 @@ if 'resultados' in st.session_state:
     if pf and os.path.exists(pf):
         st.image(pf, caption="PFD dinámico generado por la simulación")
 
-    # --- NUEVA SECCIÓN: VISUALIZACIÓN DE DIAGRAMAS PDF ESTÁTICOS ---
-    st.divider()
-    st.subheader("📁 Documentación Técnica del Proceso (ISO)")
     
-    # Creamos dos pestañas para organizar los PDFs
-    tab1, tab2 = st.tabs(["Diagrama de Bloques (DB)", "Borrador DFP"])
-
-    with tab1:
-        # Enlace de vista previa del PDF 1
-        pdf_db = "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/preview"
-        st.markdown(f'<iframe src="{pdf_db}" width="100%" height="600px"></iframe>', unsafe_allow_html=True)
-
-    with tab2:
-        # Enlace de vista previa del PDF 2
-        pdf_dfp = "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/preview"
-        st.markdown(f'<iframe src="{pdf_dfp}" width="100%" height="600px"></iframe>', unsafe_allow_html=True)
-    # -------------------------------------------------------------
 
     st.divider()
     col1, col2 = st.columns(2)
@@ -214,3 +198,21 @@ if 'resultados' in st.session_state:
                     st.warning("Escribe una pregunta.")
         else:
             st.warning("Falta GEMINI_API_KEY.")
+
+# --- NUEVA SECCIÓN: VISUALIZACIÓN DE DIAGRAMAS PDF ESTÁTICOS ---
+    st.divider()
+    st.subheader("📁 Documentación Técnica del Proceso (ISO)")
+    
+    # Creamos dos pestañas para organizar los PDFs
+    tab1, tab2 = st.tabs(["Diagrama de Bloques (DB)", "Borrador DFP"])
+
+    with tab1:
+        # Enlace de vista previa del PDF 1
+        pdf_db = "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/preview"
+        st.markdown(f'<iframe src="{pdf_db}" width="100%" height="600px"></iframe>', unsafe_allow_html=True)
+
+    with tab2:
+        # Enlace de vista previa del PDF 2
+        pdf_dfp = "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/preview"
+        st.markdown(f'<iframe src="{pdf_dfp}" width="100%" height="600px"></iframe>', unsafe_allow_html=True)
+    # -------------------------------------------------------------
