@@ -141,32 +141,36 @@ if st.sidebar.button("Simular Proceso", type="primary"):
 
 # ... (Todo el código anterior de simulación y lógica se mantiene igual)
 
-# ... (Todo el código anterior de simulación se mantiene igual)
-
 # MOSTRAR RESULTADOS
-if 'resultados' in st.session_state:
-    dm, de, ec, pf = st.session_state['resultados']
-    
+# ... (Dentro de tu bloque 'if resultados in st.session_state')
+
     if pf and os.path.exists(pf):
         st.image(pf, caption="PFD del Sistema")
         
-        # --- NUEVA FORMA NATIVA DE AGREGAR LINKS ---
         st.write("### 📂 Documentación ISO")
         col_btn1, col_btn2 = st.columns(2)
         
         with col_btn1:
-            st.link_button(
-                "DB ISO 📄", 
-                "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link",
-                use_container_width=True
-            )
+            # Opción A: Botón Nativo (Requiere Streamlit 1.27+)
+            try:
+                st.link_button(
+                    "DB ISO 📄", 
+                    "https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link",
+                    use_container_width=True
+                )
+            except AttributeError:
+                # Opción B: Enlace de respaldo si la versión es vieja
+                st.markdown('[**➡️ Abrir DB ISO (Drive)**](https://drive.google.com/file/d/1-zug-EVSwEHDY9qQMyisWeOu00l7RBiE/view?usp=drive_link)')
 
         with col_btn2:
-            st.link_button(
-                "DFP ISO 📄", 
-                "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link",
-                use_container_width=True
-            )
+            try:
+                st.link_button(
+                    "DFP ISO 📄", 
+                    "https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link",
+                    use_container_width=True
+                )
+            except AttributeError:
+                st.markdown('[**➡️ Abrir DFP ISO (Drive)**](https://drive.google.com/file/d/1gK13k1si35ynEmnBhKy7bKEF_xhVdP_b/view?usp=drive_link)')
         # ------------------------------------------
 
     col1, col2 = st.columns(2)
