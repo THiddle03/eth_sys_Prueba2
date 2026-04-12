@@ -82,17 +82,22 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
         @property
         def VOC(self): return self.system.material_cost + self.system.utility_cost
 
-    tea = TEA_Simple(
+    tea = TEA_Robusto(
         system=eth_sys, IRR=0.15, duration=(2025, 2045), depreciation='MACRS7',
         income_tax=0.3, operating_days=330, lang_factor=4.0, construction_schedule=(0.4, 0.6),
         WC_over_FCI=0.05, startup_months=6, startup_FOCfrac=0.5, startup_VOCfrac=0.5,
         startup_salesfrac=0.5, finance_interest=0, finance_years=0, finance_fraction=0
     )
     
+    tea.IRR = 0.0
+    costo_p = tea.solve_price(producto)
+    
     ind_econ = {
-        "Costo Producción ($/kg)": round(tea.solve_price(producto), 3),
+        "Costo Producción ($/kg)": round(costo_p, 3),
+        "Precio Venta ($/kg)": round(precio_etanol, 3),
         "NPV (MUSD)": round(tea.NPV/1e6, 2),
-        "ROI (%)": round(tea.ROI*100, 1)
+        "ROI (%)": round(tea.ROI*100, 1),
+        "PBP (Años)": round(tea.PBP, 2)
     }
 
     p_path = f"pfd_{uuid.uuid4().hex[:8]}.png"
@@ -101,8 +106,8 @@ def correr_simulacion(flow_water, flow_eth, temp_mosto, T_flash, P_flash,
     except:
         p_path = None
 
-    return pd.DataFrame(datos_mat), pd.DataFrame(datos_en), ind_econ, p_path, None
-
+    return df_mat, pd.DataFrame(datos_en), ind_econ, p_path, None
+                        
 # 3. INTERFAZ DE USUARIO
 st.title("🧪 Simulador Bioetanol: Control Termodinámico y Económico")
 
