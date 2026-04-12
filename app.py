@@ -114,21 +114,21 @@ st.title("🧪 Simulador Bioetanol: Control Termodinámico y Económico")
 
 # BARRA LATERAL
 st.sidebar.header("🌡️ Parámetros Proceso")
-f_w = st.sidebar.slider("Agua (kg/h)", 500, 2000, 900)
-f_e = st.sidebar.slider("Etanol (kg/h)", 50, 300, 100)
-t_mosto = st.sidebar.slider("Temp. Mosto (°C)", 10, 50, 25)
-t_flash = st.sidebar.slider("Temp. W220 (°C)", 70, 120, 92)
-p_flash = st.sidebar.slider("Presión (atm)", 0.1, 3.0, 1.0, step=0.1)
+f_w = st.sidebar.slider("Agua (kg/h)", 100, 3000, 900)
+f_e = st.sidebar.slider("Etanol (kg/h)", 50, 2000, 100)
+t_mosto = st.sidebar.slider("Temp. Alimentación Mosto (°C)", 10, 50, 25)
+t_flash = st.sidebar.slider("Temp. Salida W220 (°C)", 70, 200, 92)
+p_flash = st.sidebar.slider("Presión Separador V100 (atm)", 0.1, 10.0, 1.0, step=0.1)
 
 st.sidebar.divider()
 st.sidebar.header("💰 Parámetros Económicos")
 # Nuevos Sliders Solicitados
-p_elec = st.sidebar.slider("Precio Electricidad ($/kWh)", 0.05, 0.25, 0.085, step=0.005)
+p_elec = st.sidebar.slider("Precio Electricidad ($/kWh)", 0.01, 0.25, 0.085, step=0.005)
 p_agua_c = st.sidebar.slider("Precio Agua Enfr. ($/MJ)", 0.0001, 0.01, 0.0005, step=0.0001, format="%.4f")
 # Sliders mantenidos
 p_vapor = st.sidebar.slider("Precio Vapor ($/MJ)", 0.01, 0.10, 0.025, step=0.005)
 p_mp = st.sidebar.slider("Precio Materia Prima ($/kg)", 0.01, 0.50, 0.05, step=0.01)
-p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 3.0, 1.2, step=0.1)
+p_etanol = st.sidebar.slider("Precio Venta Etanol ($/kg)", 0.5, 25.0, 1.2, step=0.1)
 
 # Lógica de Simulación
 if st.sidebar.button("Simular Proceso", type="primary"):
